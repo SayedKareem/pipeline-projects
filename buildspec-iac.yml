@@ -1,0 +1,36 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Installing HashiCorp Packer..."
+      # ubuntu
+      - sudo apt-get update && sudo apt-get install -y gnupg software-properties-common
+      - wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+      - gpg --no-default-keyring --keyring /usr/share/keyrings/hashicorp-archive-keyring.gpg --fingerprint
+      - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+      - sudo apt update
+      - sudo apt-get install terraform -y
+
+      #Amazon linux
+      #- sudo yum install -y yum-utils
+      #- sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+      #- sudo yum -y install terraform -y
+
+      #- echo "Installing jq..."
+      #- curl -qL -o jq https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64 && chmod +x ./jq 
+      #- mv jq /usr/local/bin
+      #- pwd
+      - ls -ltr $CODEBUILD_SRC_DIR
+      - cd $CODEBUILD_SRC_DIR/hcl_iac/
+      - terraform init
+      - terraform fmt      
+      - terraform validate 
+  build:
+    commands:
+      - echo "Building HashiCorp Packer template, tomcat.pkr.hcl"
+      - terraform plan
+      #- terraform apply --auto-approve 
+  post_build:
+    commands:
+      - echo "HashiCorp Packer build completed on `date`"

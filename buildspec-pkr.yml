@@ -1,0 +1,45 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo "Installing HashiCorp Packer..."
+      #- curl -qL -o packer.zip https://releases.hashicorp.com/packer/0.12.3/packer_0.12.3_linux_amd64.zip && unzip packer.zip
+      #- mv packer /usr/local/bin
+      
+      #- sudo yum install -y yum-utils shadow-utils
+      #- sudo yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+      #- sudo yum -y install packer 
+
+      - wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+      - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list > /dev/null
+      - sudo apt-get update && sudo apt-get install packer -y
+
+      - echo "Installing jq..."
+      - curl -qL -o jq https://github.com/jqlang/jq/releases/download/jq-1.6/jq-linux64 && chmod +x ./jq 
+      - mv jq /usr/local/bin
+      - pwd
+      - ls -ltr $CODEBUILD_SRC_DIR
+      - cd $CODEBUILD_SRC_DIR/hcl_pkr/
+      - echo "Validating tomcat.pkr.hcl"
+      - packer init .
+      - packer fmt .
+      #- packer fix tomcat.pkr.hcl --works with .json files
+      - packer validate .
+  build:
+    commands:
+      ### HashiCorp Packer cannot currently obtain the AWS CodeBuild-assigned role and its credentials
+      ### Manually capture and configure the AWS CLI to provide HashiCorp Packer with AWS credentials
+      ### More info here: https://github.com/mitchellh/packer/issues/4279
+      - echo "Configuring AWS credentials"
+      - curl -qL -o aws_credentials.json http://169.254.170.2/$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI > aws_credentials.json
+      - aws configure set region $AWS_REGION
+      - aws configure set aws_access_key_id `jq -r '.AccessKeyId' aws_credentials.json`
+      - aws configure set aws_secret_access_key `jq -r '.SecretAccessKey' aws_credentials.json`
+      - aws configure set aws_session_token `jq -r '.Token' aws_credentials.json`
+      - cat aws_credentials.json
+      - echo "Building HashiCorp Packer template, tomcat.pkr.hcl"
+      - packer build .
+  post_build:
+    commands:
+      - echo "HashiCorp Packer build completed on `date`"
